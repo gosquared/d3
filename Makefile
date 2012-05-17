@@ -1,27 +1,21 @@
 # See the README for installation instructions.
 
 NODE_PATH ?= ./node_modules
-JS_COMPILER = $(NODE_PATH)/uglify-js/bin/uglifyjs
+#JS_COMPILER = $(NODE_PATH)/uglify-js/bin/uglifyjs
 JS_TESTER = $(NODE_PATH)/vows/bin/vows
 
 all: \
-	d3.v2.js \
-	d3.v2.min.js \
+	d3.js \
 	package.json
 
 # Modify this rule to build your own custom release.
 
-.INTERMEDIATE d3.v2.js: \
+.INTERMEDIATE d3.js: \
 	src/start.js \
 	d3.core.js \
 	d3.scale.js \
 	d3.svg.js \
-	d3.behavior.js \
 	d3.layout.js \
-	d3.csv.js \
-	d3.geo.js \
-	d3.geom.js \
-	d3.time.js \
 	src/end.js
 
 d3.core.js: \
@@ -219,11 +213,7 @@ d3.geom.js: \
 test: all
 	@$(JS_TESTER)
 
-%.min.js: %.js Makefile
-	@rm -f $@
-	$(JS_COMPILER) < $< > $@
-
-d3%.js: Makefile
+d3%js: Makefile
 	@rm -f $@
 	cat $(filter %.js,$^) > $@
 	@chmod a-w $@
