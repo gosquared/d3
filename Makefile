@@ -1,11 +1,12 @@
 # See the README for installation instructions.
 
 NODE_PATH ?= ./node_modules
-#JS_COMPILER = $(NODE_PATH)/uglify-js/bin/uglifyjs
+JS_COMPILER = $(shell npm root)/.bin/uglifyjs
 JS_TESTER = $(NODE_PATH)/vows/bin/vows
 
-all: \
+build: \
 	d3.js \
+	d3.min.js \
 	package.json
 
 # Modify this rule to build your own custom release.
@@ -212,6 +213,13 @@ d3.geom.js: \
 
 test: all
 	@$(JS_TESTER)
+
+$(JS_COMPILER):
+	npm install uglify-js
+
+%.min.js: %.js Makefile
+	@rm -f $@
+	$(JS_COMPILER) < $< > $@
 
 d3%js: Makefile
 	@rm -f $@
