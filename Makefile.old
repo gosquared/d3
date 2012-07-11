@@ -99,6 +99,18 @@ d3.core.js: \
 	src/core/selection-root.js \
 	src/core/selection-enter.js \
 	src/core/selection-enter-select.js \
+	src/core/transition.js \
+	src/core/transition-select.js \
+	src/core/transition-selectAll.js \
+	src/core/transition-attr.js \
+	src/core/transition-style.js \
+	src/core/transition-text.js \
+	src/core/transition-remove.js \
+	src/core/transition-delay.js \
+	src/core/transition-duration.js \
+	src/core/transition-each.js \
+	src/core/transition-transition.js \
+	src/core/timer.js \
 	src/core/transform.js \
 	src/core/mouse.js \
 	src/core/touches.js \
@@ -110,14 +122,30 @@ d3.scale.js: \
 	src/scale/linear.js \
 	src/scale/bilinear.js \
 	src/scale/polylinear.js \
+	src/scale/log.js \
+	src/scale/pow.js \
+	src/scale/sqrt.js \
+	src/scale/ordinal.js \
+	src/scale/category.js \
+	src/scale/quantile.js \
+	src/scale/quantize.js \
 	src/scale/identity.js
 
 d3.svg.js: \
 	src/svg/svg.js \
+	src/svg/arc.js \
 	src/svg/line.js \
+	src/svg/line-radial.js \
+	src/svg/area.js \
+	src/svg/area-radial.js \
+	src/svg/chord.js \
+	src/svg/diagonal.js \
+	src/svg/diagonal-radial.js \
 	src/svg/mouse.js \
 	src/svg/touches.js \
-	src/svg/axis.js
+	src/svg/symbol.js \
+	src/svg/axis.js \
+	src/svg/brush.js
 
 d3.behavior.js: \
 	src/behavior/behavior.js \
@@ -126,7 +154,18 @@ d3.behavior.js: \
 
 d3.layout.js: \
 	src/layout/layout.js \
+	src/layout/bundle.js \
+	src/layout/chord.js \
+	src/layout/force.js \
+	src/layout/partition.js \
+	src/layout/pie.js \
 	src/layout/stack.js \
+	src/layout/histogram.js \
+	src/layout/hierarchy.js \
+	src/layout/pack.js \
+	src/layout/cluster.js \
+	src/layout/tree.js \
+	src/layout/treemap.js
 
 d3.geo.js: \
 	src/geo/geo.js \
