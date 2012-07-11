@@ -10,7 +10,7 @@ try {
     d3_style_setProperty.call(this, name, value + "", priority);
   };
 }
-d3 = {version: "2.9.2"}; // semver
+d3 = {version: "2.9.6"}; // semver
 function d3_class(ctor, properties) {
   try {
     for (var key in properties) {
@@ -449,7 +449,7 @@ function d3_splitter(d) {
   return d == null;
 }
 function d3_collapse(s) {
-  return s.replace(/(^\s+)|(\s+$)/g, "").replace(/\s+/g, " ");
+  return s.replace(/^\s+|\s+$/g, "").replace(/\s+/g, " ");
 }
 d3.range = function(start, stop, step) {
   if (arguments.length < 3) {
@@ -494,7 +494,7 @@ d3.xhr = function(url, mime, callback) {
   req.onreadystatechange = function() {
     if (req.readyState === 4) {
       var s = req.status;
-      callback(s >= 200 && s < 300 || s === 304 ? req : null);
+      callback(!s && req.response || s >= 200 && s < 300 || s === 304 ? req : null);
     }
   };
   req.send(null);
@@ -1035,6 +1035,7 @@ d3.interpolateTransform = function(a, b) {
   }
 
   if (ra != rb) {
+    if (ra - rb > 180) rb += 360; else if (rb - ra > 180) ra += 360; // shortest path
     q.push({i: s.push(s.pop() + "rotate(", null, ")") - 2, x: d3.interpolateNumber(ra, rb)});
   } else if (rb) {
     s.push(s.pop() + "rotate(" + rb + ")");
@@ -1088,6 +1089,7 @@ d3.interpolateHsl = function(a, b) {
       h1 = b.h - h0,
       s1 = b.s - s0,
       l1 = b.l - l0;
+  if (h1 > 180) h1 -= 360; else if (h1 < -180) h1 += 360; // shortest path
   return function(t) {
     return d3_hsl_rgb(h0 + h1 * t, s0 + s1 * t, l0 + l1 * t).toString();
   };
@@ -1515,7 +1517,7 @@ var d3_select = function(s, n) { return n.querySelector(s); },
 
 // Prefer Sizzle, if available.
 if (typeof Sizzle === "function") {
-  d3_select = function(s, n) { return Sizzle(s, n)[0]; };
+  d3_select = function(s, n) { return Sizzle(s, n)[0] || null; };
   d3_selectAll = function(s, n) { return Sizzle.uniqueSort(Sizzle(s, n)); };
   d3_selectMatches = Sizzle.matchesSelector;
 }
@@ -1626,7 +1628,7 @@ d3_selectionPrototype.attr = function(name, value) {
       : (name.local ? attrConstantNS : attrConstant)));
 };
 d3_selectionPrototype.classed = function(name, value) {
-  var names = name.split(d3_selection_classedWhitespace),
+  var names = d3_collapse(name).split(" "),
       n = names.length,
       i = -1;
   if (arguments.length > 1) {
@@ -1637,8 +1639,6 @@ d3_selectionPrototype.classed = function(name, value) {
     return true;
   }
 };
-
-var d3_selection_classedWhitespace = /\s+/g;
 
 function d3_selection_classed(name, value) {
   var re = new RegExp("(^|\\s+)" + d3.requote(name) + "(\\s+|$)", "g");
@@ -2011,14 +2011,19 @@ d3_selectionPrototype.on = function(type, listener, capture) {
   });
 };
 d3_selectionPrototype.each = function(callback) {
-  for (var j = -1, m = this.length; ++j < m;) {
-    for (var group = this[j], i = -1, n = group.length; ++i < n;) {
-      var node = group[i];
-      if (node) callback.call(node, node.__data__, i, j);
+  return d3_selection_each(this, function(node, i, j) {
+    callback.call(node, node.__data__, i, j);
+  });
+};
+
+function d3_selection_each(groups, callback) {
+  for (var j = 0, m = groups.length; j < m; j++) {
+    for (var group = groups[j], i = 0, n = group.length, node; i < n; i++) {
+      if (node = group[i]) callback(node, i, j);
     }
   }
-  return this;
-};
+  return groups;
+}
 //
 // Note: assigning to the arguments array simultaneously changes the value of
 // the corresponding argument!
@@ -2145,12 +2150,12 @@ function d3_transition(groups, id, time) {
   };
 
   d3.timer(function(elapsed) {
-    groups.each(function(d, i, j) {
+    return d3_selection_each(groups, function(node, i, j) {
       var tweened = [],
-          node = this,
-          delay = groups[j][i].delay,
-          duration = groups[j][i].duration,
-          lock = node.__transition__ || (node.__transition__ = {active: 0, count: 0});
+          delay = node.delay,
+          duration = node.duration,
+          lock = (node = node.node).__transition__ || (node.__transition__ = {active: 0, count: 0}),
+          d = node.__data__;
 
       ++lock.count;
 
@@ -2196,7 +2201,6 @@ function d3_transition(groups, id, time) {
         return 1;
       }
     });
-    return 1;
   }, 0, time);
 
   return groups;
@@ -2341,16 +2345,14 @@ d3_transitionPrototype.remove = function() {
   });
 };
 d3_transitionPrototype.delay = function(value) {
-  var groups = this;
-  return groups.each(typeof value === "function"
-      ? function(d, i, j) { groups[j][i].delay = value.apply(this, arguments) | 0; }
-      : (value = value | 0, function(d, i, j) { groups[j][i].delay = value; }));
+  return d3_selection_each(this, typeof value === "function"
+      ? function(node, i, j) { node.delay = value.call(node = node.node, node.__data__, i, j) | 0; }
+      : (value = value | 0, function(node) { node.delay = value; }));
 };
 d3_transitionPrototype.duration = function(value) {
-  var groups = this;
-  return groups.each(typeof value === "function"
-      ? function(d, i, j) { groups[j][i].duration = Math.max(1, value.apply(this, arguments) | 0); }
-      : (value = Math.max(1, value | 0), function(d, i, j) { groups[j][i].duration = value; }));
+  return d3_selection_each(this, typeof value === "function"
+      ? function(node, i, j) { node.duration = Math.max(1, value.call(node = node.node, node.__data__, i, j) | 0); }
+      : (value = Math.max(1, value | 0), function(node) { node.duration = value; }));
 };
 function d3_transition_each(callback) {
   var id = d3_transitionId,
@@ -2360,16 +2362,11 @@ function d3_transition_each(callback) {
 
   d3_transitionId = this.id;
   d3_transitionEase = this.ease();
-  for (var j = 0, m = this.length; j < m; j++) {
-    for (var group = this[j], i = 0, n = group.length; i < n; i++) {
-      var node = group[i];
-      if (node) {
-        d3_transitionDelay = this[j][i].delay;
-        d3_transitionDuration = this[j][i].duration;
-        callback.call(node = node.node, node.__data__, i, j);
-      }
-    }
-  }
+  d3_selection_each(this, function(node, i, j) {
+    d3_transitionDelay = node.delay;
+    d3_transitionDuration = node.duration;
+    callback.call(node = node.node, node.__data__, i, j);
+  });
 
   d3_transitionId = id;
   d3_transitionEase = ease;
@@ -2813,11 +2810,11 @@ function d3_scale_log(linear, log) {
   scale.tickFormat = function(n, format) {
     if (arguments.length < 2) format = d3_scale_logFormat;
     if (arguments.length < 1) return format;
-    var k = n / scale.ticks().length,
+    var k = Math.max(.1, n / scale.ticks().length),
         f = log === d3_scale_logn ? (e = -1e-12, Math.floor) : (e = 1e-12, Math.ceil),
         e;
     return function(d) {
-      return d / pow(f(log(d) + e)) < k ? format(d) : "";
+      return d / pow(f(log(d) + e)) <= k ? format(d) : "";
     };
   };
 
@@ -3547,19 +3544,21 @@ function d3_svg_lineBasisClosed(points) {
 }
 
 function d3_svg_lineBundle(points, tension) {
-  var n = points.length - 1,
-      x0 = points[0][0],
-      y0 = points[0][1],
-      dx = points[n][0] - x0,
-      dy = points[n][1] - y0,
-      i = -1,
-      p,
-      t;
-  while (++i <= n) {
-    p = points[i];
-    t = i / n;
-    p[0] = tension * p[0] + (1 - tension) * (x0 + t * dx);
-    p[1] = tension * p[1] + (1 - tension) * (y0 + t * dy);
+  var n = points.length - 1;
+  if (n) {
+    var x0 = points[0][0],
+        y0 = points[0][1],
+        dx = points[n][0] - x0,
+        dy = points[n][1] - y0,
+        i = -1,
+        p,
+        t;
+    while (++i <= n) {
+      p = points[i];
+      t = i / n;
+      p[0] = tension * p[0] + (1 - tension) * (x0 + t * dx);
+      p[1] = tension * p[1] + (1 - tension) * (y0 + t * dy);
+    }
   }
   return d3_svg_lineBasis(points);
 }
@@ -4121,17 +4120,23 @@ d3.svg.axis = function() {
 
       tickEnter.append("line").attr("class", "tick");
       tickEnter.append("text");
-      tickUpdate.select("text").text(tickFormat);
+
+      var lineEnter = tickEnter.select("line"),
+          lineUpdate = tickUpdate.select("line"),
+          text = tick.select("text").text(tickFormat),
+          textEnter = tickEnter.select("text"),
+          textUpdate = tickUpdate.select("text");
 
       switch (orient) {
         case "bottom": {
           tickTransform = d3_svg_axisX;
           subtickEnter.attr("y2", tickMinorSize);
           subtickUpdate.attr("x2", 0).attr("y2", tickMinorSize);
-          tickEnter.select("line").attr("y2", tickMajorSize);
-          tickEnter.select("text").attr("y", Math.max(tickMajorSize, 0) + tickPadding);
-          tickUpdate.select("line").attr("x2", 0).attr("y2", tickMajorSize);
-          tickUpdate.select("text").attr("x", 0).attr("y", Math.max(tickMajorSize, 0) + tickPadding).attr("dy", ".71em").attr("text-anchor", "middle");
+          lineEnter.attr("y2", tickMajorSize);
+          textEnter.attr("y", Math.max(tickMajorSize, 0) + tickPadding);
+          lineUpdate.attr("x2", 0).attr("y2", tickMajorSize);
+          textUpdate.attr("x", 0).attr("y", Math.max(tickMajorSize, 0) + tickPadding);
+          text.attr("dy", ".71em").attr("text-anchor", "middle");
           pathUpdate.attr("d", "M" + range[0] + "," + tickEndSize + "V0H" + range[1] + "V" + tickEndSize);
           break;
         }
@@ -4139,10 +4144,11 @@ d3.svg.axis = function() {
           tickTransform = d3_svg_axisX;
           subtickEnter.attr("y2", -tickMinorSize);
           subtickUpdate.attr("x2", 0).attr("y2", -tickMinorSize);
-          tickEnter.select("line").attr("y2", -tickMajorSize);
-          tickEnter.select("text").attr("y", -(Math.max(tickMajorSize, 0) + tickPadding));
-          tickUpdate.select("line").attr("x2", 0).attr("y2", -tickMajorSize);
-          tickUpdate.select("text").attr("x", 0).attr("y", -(Math.max(tickMajorSize, 0) + tickPadding)).attr("dy", "0em").attr("text-anchor", "middle");
+          lineEnter.attr("y2", -tickMajorSize);
+          textEnter.attr("y", -(Math.max(tickMajorSize, 0) + tickPadding));
+          lineUpdate.attr("x2", 0).attr("y2", -tickMajorSize);
+          textUpdate.attr("x", 0).attr("y", -(Math.max(tickMajorSize, 0) + tickPadding));
+          text.attr("dy", "0em").attr("text-anchor", "middle");
           pathUpdate.attr("d", "M" + range[0] + "," + -tickEndSize + "V0H" + range[1] + "V" + -tickEndSize);
           break;
         }
@@ -4150,10 +4156,11 @@ d3.svg.axis = function() {
           tickTransform = d3_svg_axisY;
           subtickEnter.attr("x2", -tickMinorSize);
           subtickUpdate.attr("x2", -tickMinorSize).attr("y2", 0);
-          tickEnter.select("line").attr("x2", -tickMajorSize);
-          tickEnter.select("text").attr("x", -(Math.max(tickMajorSize, 0) + tickPadding));
-          tickUpdate.select("line").attr("x2", -tickMajorSize).attr("y2", 0);
-          tickUpdate.select("text").attr("x", -(Math.max(tickMajorSize, 0) + tickPadding)).attr("y", 0).attr("dy", ".32em").attr("text-anchor", "end");
+          lineEnter.attr("x2", -tickMajorSize);
+          textEnter.attr("x", -(Math.max(tickMajorSize, 0) + tickPadding));
+          lineUpdate.attr("x2", -tickMajorSize).attr("y2", 0);
+          textUpdate.attr("x", -(Math.max(tickMajorSize, 0) + tickPadding)).attr("y", 0);
+          text.attr("dy", ".32em").attr("text-anchor", "end");
           pathUpdate.attr("d", "M" + -tickEndSize + "," + range[0] + "H0V" + range[1] + "H" + -tickEndSize);
           break;
         }
@@ -4161,10 +4168,11 @@ d3.svg.axis = function() {
           tickTransform = d3_svg_axisY;
           subtickEnter.attr("x2", tickMinorSize);
           subtickUpdate.attr("x2", tickMinorSize).attr("y2", 0);
-          tickEnter.select("line").attr("x2", tickMajorSize);
-          tickEnter.select("text").attr("x", Math.max(tickMajorSize, 0) + tickPadding);
-          tickUpdate.select("line").attr("x2", tickMajorSize).attr("y2", 0);
-          tickUpdate.select("text").attr("x", Math.max(tickMajorSize, 0) + tickPadding).attr("y", 0).attr("dy", ".32em").attr("text-anchor", "start");
+          lineEnter.attr("x2", tickMajorSize);
+          textEnter.attr("x", Math.max(tickMajorSize, 0) + tickPadding);
+          lineUpdate.attr("x2", tickMajorSize).attr("y2", 0);
+          textUpdate.attr("x", Math.max(tickMajorSize, 0) + tickPadding).attr("y", 0);
+          text.attr("dy", ".32em").attr("text-anchor", "start");
           pathUpdate.attr("d", "M" + tickEndSize + "," + range[0] + "H0V" + range[1] + "H" + tickEndSize);
           break;
         }
