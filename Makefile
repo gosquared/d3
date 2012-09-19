@@ -120,6 +120,7 @@ d3.scale.js: \
 
 d3.svg.js: \
 	src/svg/svg.js \
+	src/svg/arc.js \
 	src/svg/line.js \
 	src/svg/mouse.js \
 	src/svg/touches.js \
