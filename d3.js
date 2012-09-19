@@ -515,6 +515,83 @@
     d3_arraySubclass(selection, d3_selection_enterPrototype);
     return selection;
   }
+  function d3_transition(groups, id, time) {
+    d3_arraySubclass(groups, d3_transitionPrototype);
+    var tweens = new d3_Map, event = d3.dispatch("start", "end"), ease = d3_transitionEase;
+    groups.id = id;
+    groups.time = time;
+    groups.tween = function(name, tween) {
+      if (arguments.length < 2) return tweens.get(name);
+      if (tween == null) tweens.remove(name); else tweens.set(name, tween);
+      return groups;
+    };
+    groups.ease = function(value) {
+      if (!arguments.length) return ease;
+      ease = typeof value === "function" ? value : d3.ease.apply(d3, arguments);
+      return groups;
+    };
+    groups.each = function(type, listener) {
+      if (arguments.length < 2) return d3_transition_each.call(groups, type);
+      event.on(type, listener);
+      return groups;
+    };
+    d3.timer(function(elapsed) {
+      return d3_selection_each(groups, function(node, i, j) {
+        function start(elapsed) {
+          if (lock.active > id) return stop();
+          lock.active = id;
+          tweens.forEach(function(key, value) {
+            if (value = value.call(node, d, i)) {
+              tweened.push(value);
+            }
+          });
+          event.start.call(node, d, i);
+          if (!tick(elapsed)) d3.timer(tick, 0, time);
+          return 1;
+        }
+        function tick(elapsed) {
+          if (lock.active !== id) return stop();
+          var t = (elapsed - delay) / duration, e = ease(t), n = tweened.length;
+          while (n > 0) {
+            tweened[--n].call(node, e);
+          }
+          if (t >= 1) {
+            stop();
+            d3_transitionId = id;
+            event.end.call(node, d, i);
+            d3_transitionId = 0;
+            return 1;
+          }
+        }
+        function stop() {
+          if (!--lock.count) delete node.__transition__;
+          return 1;
+        }
+        var tweened = [], delay = node.delay, duration = node.duration, lock = (node = node.node).__transition__ || (node.__transition__ = {
+          active: 0,
+          count: 0
+        }), d = node.__data__;
+        ++lock.count;
+        delay <= elapsed ? start(elapsed) : d3.timer(start, delay, time);
+      });
+    }, 0, time);
+    return groups;
+  }
+  function d3_transition_each(callback) {
+    var id = d3_transitionId, ease = d3_transitionEase, delay = d3_transitionDelay, duration = d3_transitionDuration;
+    d3_transitionId = this.id;
+    d3_transitionEase = this.ease();
+    d3_selection_each(this, function(node, i, j) {
+      d3_transitionDelay = node.delay;
+      d3_transitionDuration = node.duration;
+      callback.call(node = node.node, node.__data__, i, j);
+    });
+    d3_transitionId = id;
+    d3_transitionEase = ease;
+    d3_transitionDelay = delay;
+    d3_transitionDuration = duration;
+    return this;
+  }
   function d3_mousePoint(container, e) {
     var svg = container.ownerSVGElement || container;
     if (svg.createSVGPoint) {
@@ -2348,6 +2425,124 @@
       }
     }
     return d3_selection(subgroups);
+  };
+  var d3_transitionPrototype = [], d3_transitionNextId = 0, d3_transitionId = 0, d3_transitionDefaultDelay = 0, d3_transitionDefaultDuration = 250, d3_transitionDefaultEase = d3.ease("cubic-in-out"), d3_transitionDelay = d3_transitionDefaultDelay, d3_transitionDuration = d3_transitionDefaultDuration, d3_transitionEase = d3_transitionDefaultEase;
+  d3_transitionPrototype.call = d3_selectionPrototype.call;
+  d3.transition = function(selection) {
+    return arguments.length ? d3_transitionId ? selection.transition() : selection : d3_selectionRoot.transition();
+  };
+  d3.transition.prototype = d3_transitionPrototype;
+  d3_transitionPrototype.select = function(selector) {
+    var subgroups = [], subgroup, subnode, node;
+    if (typeof selector !== "function") selector = d3_selection_selector(selector);
+    for (var j = -1, m = this.length; ++j < m; ) {
+      subgroups.push(subgroup = []);
+      for (var group = this[j], i = -1, n = group.length; ++i < n; ) {
+        if ((node = group[i]) && (subnode = selector.call(node.node, node.node.__data__, i))) {
+          if ("__data__" in node.node) subnode.__data__ = node.node.__data__;
+          subgroup.push({
+            node: subnode,
+            delay: node.delay,
+            duration: node.duration
+          });
+        } else {
+          subgroup.push(null);
+        }
+      }
+    }
+    return d3_transition(subgroups, this.id, this.time).ease(this.ease());
+  };
+  d3_transitionPrototype.selectAll = function(selector) {
+    var subgroups = [], subgroup, subnodes, node;
+    if (typeof selector !== "function") selector = d3_selection_selectorAll(selector);
+    for (var j = -1, m = this.length; ++j < m; ) {
+      for (var group = this[j], i = -1, n = group.length; ++i < n; ) {
+        if (node = group[i]) {
+          subnodes = selector.call(node.node, node.node.__data__, i);
+          subgroups.push(subgroup = []);
+          for (var k = -1, o = subnodes.length; ++k < o; ) {
+            subgroup.push({
+              node: subnodes[k],
+              delay: node.delay,
+              duration: node.duration
+            });
+          }
+        }
+      }
+    }
+    return d3_transition(subgroups, this.id, this.time).ease(this.ease());
+  };
+  d3_transitionPrototype.attr = function(name, value) {
+    if (arguments.length < 2) {
+      for (value in name) this.attrTween(value, d3_tweenByName(name[value], value));
+      return this;
+    }
+    return this.attrTween(name, d3_tweenByName(value, name));
+  };
+  d3_transitionPrototype.attrTween = function(nameNS, tween) {
+    function attrTween(d, i) {
+      var f = tween.call(this, d, i, this.getAttribute(name));
+      return f === d3_tweenRemove ? (this.removeAttribute(name), null) : f && function(t) {
+        this.setAttribute(name, f(t));
+      };
+    }
+    function attrTweenNS(d, i) {
+      var f = tween.call(this, d, i, this.getAttributeNS(name.space, name.local));
+      return f === d3_tweenRemove ? (this.removeAttributeNS(name.space, name.local), null) : f && function(t) {
+        this.setAttributeNS(name.space, name.local, f(t));
+      };
+    }
+    var name = d3.ns.qualify(nameNS);
+    return this.tween("attr." + nameNS, name.local ? attrTweenNS : attrTween);
+  };
+  d3_transitionPrototype.style = function(name, value, priority) {
+    var n = arguments.length;
+    if (n < 3) {
+      if (typeof name !== "string") {
+        if (n < 2) value = "";
+        for (priority in name) this.styleTween(priority, d3_tweenByName(name[priority], priority), value);
+        return this;
+      }
+      priority = "";
+    }
+    return this.styleTween(name, d3_tweenByName(value, name), priority);
+  };
+  d3_transitionPrototype.styleTween = function(name, tween, priority) {
+    if (arguments.length < 3) priority = "";
+    return this.tween("style." + name, function(d, i) {
+      var f = tween.call(this, d, i, window.getComputedStyle(this, null).getPropertyValue(name));
+      return f === d3_tweenRemove ? (this.style.removeProperty(name), null) : f && function(t) {
+        this.style.setProperty(name, f(t), priority);
+      };
+    });
+  };
+  d3_transitionPrototype.text = function(value) {
+    return this.tween("text", function(d, i) {
+      this.textContent = typeof value === "function" ? value.call(this, d, i) : value;
+    });
+  };
+  d3_transitionPrototype.remove = function() {
+    return this.each("end.transition", function() {
+      var p;
+      if (!this.__transition__ && (p = this.parentNode)) p.removeChild(this);
+    });
+  };
+  d3_transitionPrototype.delay = function(value) {
+    return d3_selection_each(this, typeof value === "function" ? function(node, i, j) {
+      node.delay = value.call(node = node.node, node.__data__, i, j) | 0;
+    } : (value = value | 0, function(node) {
+      node.delay = value;
+    }));
+  };
+  d3_transitionPrototype.duration = function(value) {
+    return d3_selection_each(this, typeof value === "function" ? function(node, i, j) {
+      node.duration = Math.max(1, value.call(node = node.node, node.__data__, i, j) | 0);
+    } : (value = Math.max(1, value | 0), function(node) {
+      node.duration = value;
+    }));
+  };
+  d3_transitionPrototype.transition = function() {
+    return this.select(d3_this);
   };
   d3.mouse = function(container) {
     return d3_mousePoint(container, d3_eventSource());

@@ -106,6 +106,17 @@ d3.core.js: \
 	src/core/selection-root.js \
 	src/core/selection-enter.js \
 	src/core/selection-enter-select.js \
+	src/core/transition.js \
+	src/core/transition-select.js \
+	src/core/transition-selectAll.js \
+	src/core/transition-attr.js \
+	src/core/transition-style.js \
+	src/core/transition-text.js \
+	src/core/transition-remove.js \
+	src/core/transition-delay.js \
+	src/core/transition-duration.js \
+	src/core/transition-each.js \
+	src/core/transition-transition.js \
 	src/core/mouse.js \
 	src/core/touches.js \
 	src/core/noop.js
