@@ -623,6 +623,12 @@
     }
     return then;
   }
+  function d3_tweenNull(d, i, a) {
+    return a != "" && d3_tweenRemove;
+  }
+  function d3_tweenByName(b, name) {
+    return d3.tween(b, d3_interpolateByName(name));
+  }
   function d3_mousePoint(container, e) {
     var svg = container.ownerSVGElement || container;
     if (svg.createSVGPoint) {
@@ -2616,6 +2622,17 @@
   var d3_timer_frame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.oRequestAnimationFrame || window.msRequestAnimationFrame || function(callback) {
     setTimeout(callback, 17);
   };
+  d3.tween = function(b, interpolate) {
+    function tweenFunction(d, i, a) {
+      var v = b.call(this, d, i);
+      return v == null ? a != "" && d3_tweenRemove : a != v && interpolate(a, v);
+    }
+    function tweenString(d, i, a) {
+      return a != b && interpolate(a, b);
+    }
+    return typeof b === "function" ? tweenFunction : b == null ? d3_tweenNull : (b += "", tweenString);
+  };
+  var d3_tweenRemove = {};
   d3.mouse = function(container) {
     return d3_mousePoint(container, d3_eventSource());
   };
@@ -2942,4 +2959,53 @@
     },
     zero: d3_layout_stackOffsetZero
   });
+  d3.layout.pie = function() {
+    function pie(data, i) {
+      var values = data.map(function(d, i) {
+        return +value.call(pie, d, i);
+      });
+      var a = +(typeof startAngle === "function" ? startAngle.apply(this, arguments) : startAngle);
+      var k = ((typeof endAngle === "function" ? endAngle.apply(this, arguments) : endAngle) - startAngle) / d3.sum(values);
+      var index = d3.range(data.length);
+      if (sort != null) index.sort(sort === d3_layout_pieSortByValue ? function(i, j) {
+        return values[j] - values[i];
+      } : function(i, j) {
+        return sort(data[i], data[j]);
+      });
+      var arcs = [];
+      index.forEach(function(i) {
+        var d;
+        arcs[i] = {
+          data: data[i],
+          value: d = values[i],
+          startAngle: a,
+          endAngle: a += d * k
+        };
+      });
+      return arcs;
+    }
+    var value = Number, sort = d3_layout_pieSortByValue, startAngle = 0, endAngle = 2 * Math.PI;
+    pie.value = function(x) {
+      if (!arguments.length) return value;
+      value = x;
+      return pie;
+    };
+    pie.sort = function(x) {
+      if (!arguments.length) return sort;
+      sort = x;
+      return pie;
+    };
+    pie.startAngle = function(x) {
+      if (!arguments.length) return startAngle;
+      startAngle = x;
+      return pie;
+    };
+    pie.endAngle = function(x) {
+      if (!arguments.length) return endAngle;
+      endAngle = x;
+      return pie;
+    };
+    return pie;
+  };
+  var d3_layout_pieSortByValue = {};
 })();

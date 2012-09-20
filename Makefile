@@ -119,6 +119,7 @@ d3.core.js: \
 	src/core/transition-transition.js \
 	src/core/timer.js \
 	src/core/transform.js \
+	src/core/tween.js \
 	src/core/mouse.js \
 	src/core/touches.js \
 	src/core/noop.js
@@ -147,6 +148,7 @@ d3.behavior.js: \
 d3.layout.js: \
 	src/layout/layout.js \
 	src/layout/stack.js \
+	src/layout/pie.js \
 
 d3.geo.js: \
 	src/geo/geo.js \
