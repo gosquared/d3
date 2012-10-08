@@ -19,6 +19,7 @@ build: \
 	d3.core.js \
 	d3.scale.js \
 	d3.svg.js \
+	d3.time.js \
 	d3.layout.js \
 	src/end.js
 
